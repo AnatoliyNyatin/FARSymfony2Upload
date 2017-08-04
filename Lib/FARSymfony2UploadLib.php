@@ -28,6 +28,7 @@ class FARSymfony2UploadLib
      * @param Session $session
      * @param string $param_prefix
      * @param string $param_temp_path
+     * @param string $param_temp_path_url_prefix
      * @param string $param_thumbnail_directory_prefix
      * @param string $param_thumbnail_driver
      * @param string $param_thumbnail_size
@@ -45,6 +46,7 @@ class FARSymfony2UploadLib
         Session $session,
         $param_prefix,
         $param_temp_path,
+        $param_temp_path_url_prefix,
         $param_thumbnail_directory_prefix,
         $param_thumbnail_driver,
         $param_thumbnail_size,
@@ -63,6 +65,7 @@ class FARSymfony2UploadLib
 
         $this->params['param_prefix'] = $param_prefix;
         $this->params['param_temp_path'] = $param_temp_path;
+        $this->params['param_temp_path_url_prefix'] = $param_temp_path_url_prefix;
         $this->params['param_thumbnail_directory_prefix'] = $param_thumbnail_directory_prefix;
         $this->params['param_thumbnail_driver'] = $param_thumbnail_driver;
         $this->params['param_thumbnail_size'] = $param_thumbnail_size;
@@ -583,10 +586,26 @@ class FARSymfony2UploadLib
      */
     private function getTumbnailURLResponse($properties)
     {
-        return $this->request->getBaseUrl().'/tmp/'.
+        return $this->params['param_temp_path_url_prefix'].'/tmp/'.
         $properties['session'].'/'.
         $properties['id_session'].'/'.
         $properties['thumbnail_name'];
+    }
+
+    /**
+     * @param $filename
+     * @return array
+     */
+    public function getThumbnailFileName($filename)
+    {
+        $original_name = pathinfo($filename);
+        $name = $original_name['filename'];
+        $extension = $original_name['extension'];
+
+        return [
+            'filename' => $name.'_'.$this->params['param_thumbnail_size'].'.'.$extension,
+            'prefix_path' => $this->params['param_temp_path_url_prefix'].'/tmp/'
+        ];
     }
 
     /**

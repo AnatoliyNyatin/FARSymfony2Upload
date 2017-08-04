@@ -24,6 +24,7 @@ class FARSymfony2UploadExtension extends Extension
 
         $container->setParameter('far_symfony2_upload.prefix', $config['prefix']);
         $container->setParameter('far_symfony2_upload.temp_path', $config['temp_path']);
+        $container->setParameter('far_symfony2_upload.temp_path_url_prefix', $config['temp_path_url_prefix']);
         $container->setParameter(
             'far_symfony2_upload.thumbnail_directory_prefix',
             $config['thumbnail_directory_prefix']

@@ -10,6 +10,7 @@ services:
             - '@session'
             - '%far_symfony2_upload.prefix%'
             - '%far_symfony2_upload.temp_path%'
+            - '%far_symfony2_upload.temp_path_url_prefix%'
             - '%far_symfony2_upload.thumbnail_directory_prefix%'
             - '%far_symfony2_upload.thumbnail_driver%'
             - '%far_symfony2_upload.thumbnail_size%'
