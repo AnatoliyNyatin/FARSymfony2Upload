@@ -32,6 +32,7 @@ class FARSymfony2UploadLib
      * @param string $param_thumbnail_directory_prefix
      * @param string $param_thumbnail_driver
      * @param string $param_thumbnail_size
+     * @param boolean $param_create_thumbnail
      * @param string $param_max_file_size
      * @param string $param_max_files_upload
      * @param string $param_file_extensions_allowed
@@ -50,6 +51,7 @@ class FARSymfony2UploadLib
         $param_thumbnail_directory_prefix,
         $param_thumbnail_driver,
         $param_thumbnail_size,
+        $param_create_thumbnail,
         $param_max_file_size,
         $param_max_files_upload,
         $param_file_extensions_allowed,
@@ -69,6 +71,7 @@ class FARSymfony2UploadLib
         $this->params['param_thumbnail_directory_prefix'] = $param_thumbnail_directory_prefix;
         $this->params['param_thumbnail_driver'] = $param_thumbnail_driver;
         $this->params['param_thumbnail_size'] = $param_thumbnail_size;
+        $this->params['param_create_thumbnail'] = $param_create_thumbnail;
         $this->params['param_max_file_size'] = $param_max_file_size;
         $this->params['param_max_files_upload'] = $param_max_files_upload;
         $this->params['param_file_extensions_allowed'] = $param_file_extensions_allowed;
@@ -100,7 +103,9 @@ class FARSymfony2UploadLib
                 $validFile = $this->validateFile($properties);
                 if ($validFile[0] == true) {
                     $file->move($properties['temp_dir'], $properties['name_uid']);
-                    $this->createThumbnail($properties);
+                    if ($this->params['param_create_thumbnail']) {
+                        $this->createThumbnail($properties);
+                    }
                 }
                 $response['data'] = $this->getjQueryUploadResponse($properties, $validFile);
             }
@@ -158,12 +163,14 @@ class FARSymfony2UploadLib
             }
         }
 
-        $files = $this->local_filesystem->listContents($php_session.'/'.
+        if ($this->params['param_create_thumbnail']) {
+            $files = $this->local_filesystem->listContents($php_session.'/'.
                                                        $id_session.'/'.
-                                                       $this->params['param_thumbnail_directory_prefix']);
-        foreach ($files as $file) {
-            if ($file['type'] == 'file') {
-                array_push($filesNew, $this->mappingFileSystem($file, 'thumbnail'));
+                                                           $this->params['param_thumbnail_directory_prefix']);
+            foreach ($files as $file) {
+                if ($file['type'] == 'file') {
+                    array_push($filesNew, $this->mappingFileSystem($file, 'thumbnail'));
+                }
             }
         }
 
@@ -199,6 +206,7 @@ class FARSymfony2UploadLib
         $filesNew['extensionOrig'] = $files['extension'];
         $filesNew['filenameOrig'] =$files['filename'];
         $filesNew['pathDest'] = $files['path'];
+        $filesNew['path'] = $this->getTempPathPrefix() . $files['path'];
         if ($type == 'file') {
             $filesNew['thumbnail'] = false;
         } else {
@@ -643,7 +651,7 @@ class FARSymfony2UploadLib
      */
     private function getURLResponse($properties)
     {
-        return $this->request->getBaseUrl().'/tmp/'.
+        return $this->params['param_temp_path_url_prefix'].'/tmp/'.
                $properties['session'].'/'.
                $properties['id_session'].'/'.
                $properties['name_uid'];
@@ -692,6 +700,14 @@ class FARSymfony2UploadLib
             'filename' => $name.'_'.$this->params['param_thumbnail_size'].'.'.$extension,
             'prefix_path' => $this->params['param_temp_path_url_prefix'].'/tmp/'
         ];
+    }
+
+    /**
+     * @return string
+     */
+    public function getTempPathPrefix()
+    {
+        return $this->params['param_temp_path_url_prefix'].'/tmp/';
     }
 
     public function getThumbnailTempFilePath($filename, $session, $id_session)

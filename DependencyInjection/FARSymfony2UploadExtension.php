@@ -31,6 +31,7 @@ class FARSymfony2UploadExtension extends Extension
         );
         $container->setParameter('far_symfony2_upload.thumbnail_driver', $config['thumbnail_driver']);
         $container->setParameter('far_symfony2_upload.thumbnail_size', $config['thumbnail_size']);
+        $container->setParameter('far_symfony2_upload.create_thumbnail', $config['create_thumbnail']);
         $container->setParameter('far_symfony2_upload.max_file_size', $config['max_file_size']);
         $container->setParameter('far_symfony2_upload.max_files_upload', $config['max_files_upload']);
         $container->setParameter('far_symfony2_upload.file_extensions_allowed', $config['file_extensions_allowed']);

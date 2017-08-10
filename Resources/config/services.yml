@@ -14,6 +14,7 @@ services:
             - '%far_symfony2_upload.thumbnail_directory_prefix%'
             - '%far_symfony2_upload.thumbnail_driver%'
             - '%far_symfony2_upload.thumbnail_size%'
+            - '%far_symfony2_upload.create_thumbnail%'
             - '%far_symfony2_upload.max_file_size%'
             - '%far_symfony2_upload.max_files_upload%'
             - '%far_symfony2_upload.file_extensions_allowed%'
