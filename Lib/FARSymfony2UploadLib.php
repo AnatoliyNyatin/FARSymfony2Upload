@@ -236,6 +236,90 @@ class FARSymfony2UploadLib
 
     /**
      * @param array $files
+     * @param string $tempPath
+     * @param string $path
+     *
+     * @return array()
+     */
+    public function setReplaceTempListFilesPath($files, $tempPath, $path)
+    {
+        $filesNew = array();
+
+        foreach ($files as $file) {
+            /*if ($file['thumbnail'] == true) {
+                $path = $path.'/'.$this->params['param_thumbnail_directory_prefix'];
+            }*/
+            $file['pathDest'] = str_replace($tempPath, $path, $file['pathDest']);
+            $file['dirnameDest'] = $path;
+            array_push($filesNew, $file);
+        }
+
+        return $filesNew;
+    }
+
+
+
+    /**
+     * @param array $files
+     * @param boolean $rewriteFile
+     *
+     * @return array()
+     */
+    public function syncTempFilesLocal($files, $rewriteFile)
+    {
+        $filesNew = array();
+
+        foreach ($files as $file) {
+            $exist = $this->local_filesystem->has($file['pathDest']);
+            if (($exist && $rewriteFile) || !$exist) {
+                $contents = $this->local_filesystem->read($file['pathOrig']);
+                if (!$exist) {
+                    $file['saved'] = $this->local_filesystem->write($file['pathDest'], $contents);
+                } else {
+                    $file['saved'] = $this->local_filesystem->update($file['pathDest'], $contents);
+                }
+                $file['duplicated'] = false;
+            } else {
+                $file = $this->discoverLocalFilename($file);
+                $contents = $this->local_filesystem->read($file['pathOrig']);
+                $file['saved'] = $this->local_filesystem->write($file['pathDest'], $contents);
+                $file['duplicated'] = true;
+            }
+            array_push($filesNew, $file);
+        }
+
+        return $filesNew;
+    }
+
+    /**
+     * @param array $file
+     *
+     * @return array()
+     */
+    public function discoverLocalFilename($file)
+    {
+        $i = 1;
+
+        if ($this->local_filesystem->has($file['dirnameDest'].'/'.
+            $file['filenameDest'].'.'.
+            $file['extensionDest'])) {
+            while ($this->local_filesystem->has($file['dirnameDest'].'/'.
+                $file['filenameDest'].'('.$i.')'.'.'.
+                $file['extensionDest'])) {
+                $i++;
+            }
+            $file['filenameDest'] = $file['filenameDest'].'('.$i.')';
+            $file['basenameDest'] = $file['filenameDest'].'.'.
+                $file['extensionDest'];
+            $file['pathDest'] = $file['dirnameDest'].'/'.
+                $file['basenameDest'];
+        }
+
+        return $file;
+    }
+
+    /**
+     * @param array $files
      * @param boolean $rewriteFile
      *
      * @return array()
@@ -348,8 +432,10 @@ class FARSymfony2UploadLib
     private function getFileProperties($file)
     {
         $properties = array();
+        $fileInfo = pathinfo($file->getClientOriginalName());
 
-        $properties['original_name'] = $file->getClientOriginalName();
+        $properties['original_name'] = md5($file->getClientOriginalName().time()).'.'.$fileInfo['extension'];
+        $properties['upload_original_name'] = $file->getClientOriginalName();
         $properties['extension'] = $file->guessExtension();
 
         $properties['name'] = $this->getFileNameOrThumbnail($properties['original_name'], false);
@@ -606,6 +692,16 @@ class FARSymfony2UploadLib
             'filename' => $name.'_'.$this->params['param_thumbnail_size'].'.'.$extension,
             'prefix_path' => $this->params['param_temp_path_url_prefix'].'/tmp/'
         ];
+    }
+
+    public function getThumbnailTempFilePath($filename, $session, $id_session)
+    {
+        $properties = $this->getThumbnailFileName($filename);
+        $properties['thumbnail_name'] = $properties['filename'];
+        $properties['session'] = $session;
+        $properties['id_session'] = $id_session;
+
+        return $this->getTumbnailURLResponse($properties);
     }
 
     /**
