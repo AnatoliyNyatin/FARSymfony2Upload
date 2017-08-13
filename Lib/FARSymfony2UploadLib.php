@@ -147,6 +147,21 @@ class FARSymfony2UploadLib
     }
 
     /**
+     * @param $id_session
+     * @param $php_session
+     * @param $image
+     *
+     * @return array()
+     */
+    public function processDeleteRemote($path, $image)
+    {
+        $path = $this->params['param_temp_path'].'/../'.$path.'/';
+        $response = $this->deleteFile($path, $image);
+
+        return $response;
+    }
+
+    /**
      * @param $php_session
      * @param $id_session
      *
@@ -178,12 +193,43 @@ class FARSymfony2UploadLib
     }
 
     /**
-     * @param array $files
-     * @param string $type
+     * @param $php_session
+     * @param $id_session
      *
      * @return array()
      */
-    private function mappingFileSystem($files, $type)
+    public function getListFilesRemote($path)
+    {
+        $filesNew = array();
+
+        $files = $this->remote_filesystem->listContents($path);
+        foreach ($files as $file) {
+            if ($file['type'] == 'file') {
+                array_push($filesNew, $this->mappingFileSystem($file, 'file', true));
+            }
+        }
+
+        if ($this->params['param_create_thumbnail']) {
+            $files = $this->remote_filesystem->listContents($path .'/'.
+                $this->params['param_thumbnail_directory_prefix']);
+            foreach ($files as $file) {
+                if ($file['type'] == 'file') {
+                    array_push($filesNew, $this->mappingFileSystem($file, 'thumbnail', true));
+                }
+            }
+        }
+
+        return $filesNew;
+    }
+
+    /**
+     * @param array $files
+     * @param string $type
+     *
+     * @param bool $remote
+     * @return array
+     */
+    private function mappingFileSystem($files, $type, $remote = false)
     {
         /*
         0 = {array} [8]
@@ -206,7 +252,8 @@ class FARSymfony2UploadLib
         $filesNew['extensionOrig'] = $files['extension'];
         $filesNew['filenameOrig'] =$files['filename'];
         $filesNew['pathDest'] = $files['path'];
-        $filesNew['path'] = $this->getTempPathPrefix() . $files['path'];
+        $filesNew['path'] = (!$remote ? $this->getTempPathPrefix() : $this->params['param_temp_path_url_prefix'] . '/')
+            . $files['path'];
         if ($type == 'file') {
             $filesNew['thumbnail'] = false;
         } else {
