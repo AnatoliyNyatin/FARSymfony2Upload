@@ -102,6 +102,7 @@ class FARSymfony2UploadLib
 
                 $validFile = $this->validateFile($properties);
                 if ($validFile[0] == true) {
+                    $this->imageFixOrientation($file);
                     $file->move($properties['temp_dir'], $properties['name_uid']);
                     if ($this->params['param_create_thumbnail']) {
                         $this->createThumbnail($properties);
@@ -114,6 +115,50 @@ class FARSymfony2UploadLib
         $response['headers'] = $this->getHeadersJSON();
 
         return $response;
+    }
+
+    /**
+     * @param UploadedFile $file
+     */
+    private function imageFixOrientation(UploadedFile $file)
+    {
+        $filePath = $file->getPathname();
+        $type = $file->getClientMimeType();
+
+        $meta = @exif_read_data($filePath);
+
+        if (!empty($meta['Orientation'])) {
+            $imageResource = false;
+
+            switch ($type) {
+                case 'image/jpeg':
+                    $imageResource = imagecreatefromjpeg($filePath);
+                    break;
+                case 'image/png':
+                    $imageResource = imagecreatefrompng($filePath);
+                    break;
+            }
+
+            if ($imageResource) {
+                switch ($meta['Orientation']) {
+                    case 3:
+                        $image = imagerotate($imageResource, 180, 0);
+                        break;
+                    case 6:
+                        $image = imagerotate($imageResource, -90, 0);
+                        break;
+                    case 8:
+                        $image = imagerotate($imageResource, 90, 0);
+                        break;
+                    default:
+                        $image = $imageResource;
+                }
+                imagejpeg($image, $filePath, 90);
+
+                imagedestroy($image);
+            }
+
+        }
     }
 
     /**
