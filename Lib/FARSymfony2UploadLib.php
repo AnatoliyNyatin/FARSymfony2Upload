@@ -186,10 +186,8 @@ class FARSymfony2UploadLib
      */
     public function processDelete($id_session, $php_session, $image)
     {
-        $path = $this->params['param_temp_path'].'/'.$php_session.'/'.$id_session.'/';
-        $response = $this->deleteFile($path, $image);
-
-        return $response;
+        $path = $php_session.'/'.$id_session.'/';
+        return $this->deleteFile($path, $image);
     }
 
     /**
@@ -677,15 +675,14 @@ class FARSymfony2UploadLib
     private function deleteFile($path, $file)
     {
         // TODO: Borrar miniaturas PS
-        $filesystem = new Filesystem();
         $fileTemp = $path.$file;
         $thumbnail = $path.$this->getFileNameOrThumbnail($file, true);
 
-        if ($filesystem->exists($fileTemp)) {
-            $filesystem->remove($fileTemp);
+        if ($this->local_filesystem->has($fileTemp)) {
+            $this->local_filesystem->delete($fileTemp);
         }
-        if ($filesystem->exists($thumbnail)) {
-            $filesystem->remove($thumbnail);
+        if ($this->local_filesystem->has($thumbnail)) {
+            $this->local_filesystem->delete($thumbnail);
         }
         $response[0][$fileTemp] = true;
 
