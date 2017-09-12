@@ -725,7 +725,7 @@ class FARSymfony2UploadLib
         $response[0]['size'] = $properties['size'];
         if ($validFile[0]) {
             $response[0]['url'] = $this->getURLResponse($properties);
-            $response[0]['thumbnailUrl'] = $this->getTumbnailURLResponse($properties);
+            $response[0]['thumbnailUrl'] = $this->getThumbnailURLResponse($properties);
             $response[0]['deleteUrl'] =  $this->getURLResponseDelete($properties);
             $response[0]['deleteType'] = 'DELETE';
             $response[0]['type'] = $properties['mimetype'];
@@ -770,7 +770,7 @@ class FARSymfony2UploadLib
      *
      * @return string
      */
-    private function getTumbnailURLResponse($properties)
+    private function getThumbnailURLResponse($properties)
     {
         return $this->params['param_temp_path_url_prefix'].'/tmp/'.
             $properties['session'].'/'.
@@ -809,7 +809,7 @@ class FARSymfony2UploadLib
         $properties['session'] = $session;
         $properties['id_session'] = $id_session;
 
-        return $this->getTumbnailURLResponse($properties);
+        return $this->getThumbnailURLResponse($properties);
     }
 
     /**
