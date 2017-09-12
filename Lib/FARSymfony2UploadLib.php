@@ -93,8 +93,8 @@ class FARSymfony2UploadLib
         /* @var FileBag $filebag */
         foreach ($this->request->files as $filebag) {
             /* @var UploadedFile $file */
-            foreach ($filebag as $file) {
-                $properties = $this->getFileProperties($file);
+            foreach ($filebag as $uploadedFile) {
+                $properties = $this->getFileProperties($uploadedFile);
 
                 $properties['name'] = $this->discoverLocalTempFilename($properties);
                 $properties['name_uid'] = $properties['name'];
@@ -102,11 +102,12 @@ class FARSymfony2UploadLib
 
                 $validFile = $this->validateFile($properties);
                 if ($validFile[0] == true) {
-                    $this->imageFixOrientation($file);
-                    $file->move($properties['temp_dir'], $properties['name_uid']);
-                    if ($this->params['param_create_thumbnail']) {
-                        $this->createThumbnail($properties);
-                    }
+                    $this->imageFixOrientation($uploadedFile);
+                    $file = [];
+                    $file['pathDest'] = $properties['session'].'/'.$id_session.'/'.$properties['name_uid'];
+
+                    $contents = file_get_contents($uploadedFile->getRealPath());
+                    $file['saved'] = $this->local_filesystem->write($file['pathDest'], $contents);
                 }
                 $response['data'] = $this->getjQueryUploadResponse($properties, $validFile);
             }
@@ -185,10 +186,8 @@ class FARSymfony2UploadLib
      */
     public function processDelete($id_session, $php_session, $image)
     {
-        $path = $this->params['param_temp_path'].'/'.$php_session.'/'.$id_session.'/';
-        $response = $this->deleteFile($path, $image);
-
-        return $response;
+        $path = $php_session.'/'.$id_session.'/';
+        return $this->deleteFile($path, $image);
     }
 
     /**
@@ -224,9 +223,10 @@ class FARSymfony2UploadLib
         }
 
         if ($this->params['param_create_thumbnail']) {
-            $files = $this->local_filesystem->listContents($php_session.'/'.
-                                                       $id_session.'/'.
-                                                           $this->params['param_thumbnail_directory_prefix']);
+            $files = $this->local_filesystem->listContents(
+                $php_session.'/'.$id_session.'/'.
+                $this->params['param_thumbnail_directory_prefix']
+            );
             foreach ($files as $file) {
                 if ($file['type'] == 'file') {
                     array_push($filesNew, $this->mappingFileSystem($file, 'thumbnail'));
@@ -460,8 +460,8 @@ class FARSymfony2UploadLib
         $i = 1;
 
         if ($this->remote_filesystem->has($file['dirnameDest'].'/'.
-                                          $file['filenameDest'].'.'.
-                                          $file['extensionDest'])) {
+            $file['filenameDest'].'.'.
+            $file['extensionDest'])) {
             while ($this->remote_filesystem->has($file['dirnameDest'].'/'.
                 $file['filenameDest'].'('.$i.')'.'.'.
                 $file['extensionDest'])) {
@@ -469,9 +469,9 @@ class FARSymfony2UploadLib
             }
             $file['filenameDest'] = $file['filenameDest'].'('.$i.')';
             $file['basenameDest'] = $file['filenameDest'].'.'.
-                                    $file['extensionDest'];
+                $file['extensionDest'];
             $file['pathDest'] = $file['dirnameDest'].'/'.
-                                $file['basenameDest'];
+                $file['basenameDest'];
         }
 
         return $file;
@@ -493,16 +493,16 @@ class FARSymfony2UploadLib
         $dirname = $properties['temp_dir'];
 
         if ($filesystem->exists($dirname.'/'.
-                                $filename.'.'.
-                                $extension)) {
+            $filename.'.'.
+            $extension)) {
             while ($filesystem->exists($dirname.'/'.
-                                       $filename.'('.$i.')'.'.'.
-                                       $extension)) {
+                $filename.'('.$i.')'.'.'.
+                $extension)) {
                 $i++;
             }
 
             $filenameDef = $filename.'('.$i.')'.'.'.
-                           $extension;
+                $extension;
         } else {
             $filenameDef = $properties['name_uid'];
         }
@@ -546,9 +546,7 @@ class FARSymfony2UploadLib
         $properties['mimetype'] = $file->getMimeType();
         $properties['session'] = $this->session->getId();
         $properties['id_session'] = $this->id_session;
-        $properties['temp_dir'] = $this->params['param_temp_path'].'/'.
-            $this->session->getId().'/'.
-            $properties['id_session'];
+        $properties['temp_dir'] = $this->session->getId().'/'.$properties['id_session'];
 
         return $properties;
     }
@@ -623,8 +621,8 @@ class FARSymfony2UploadLib
     {
         $valid = false;
         $directoryFindFiles = $this->params['param_temp_path'] . '/' .
-                              $properties['session'] . '/' .
-                              $properties['id_session'];
+            $properties['session'] . '/' .
+            $properties['id_session'];
 
         $fs = new Filesystem();
         if ($fs->exists($directoryFindFiles)) {
@@ -677,15 +675,14 @@ class FARSymfony2UploadLib
     private function deleteFile($path, $file)
     {
         // TODO: Borrar miniaturas PS
-        $filesystem = new Filesystem();
         $fileTemp = $path.$file;
         $thumbnail = $path.$this->getFileNameOrThumbnail($file, true);
 
-        if ($filesystem->exists($fileTemp)) {
-            $filesystem->remove($fileTemp);
+        if ($this->local_filesystem->has($fileTemp)) {
+            $this->local_filesystem->delete($fileTemp);
         }
-        if ($filesystem->exists($thumbnail)) {
-            $filesystem->remove($thumbnail);
+        if ($this->local_filesystem->has($thumbnail)) {
+            $this->local_filesystem->delete($thumbnail);
         }
         $response[0][$fileTemp] = true;
 
@@ -706,8 +703,8 @@ class FARSymfony2UploadLib
 
         if ($thumbnail) {
             return $this->params['param_thumbnail_directory_prefix'].'/'.
-                          $name.'_'.
-                          $this->params['param_thumbnail_size'].'.'.$extension;
+                $name.'_'.
+                $this->params['param_thumbnail_size'].'.'.$extension;
         } else {
             return $name;
         }
@@ -725,7 +722,7 @@ class FARSymfony2UploadLib
         $response[0]['size'] = $properties['size'];
         if ($validFile[0]) {
             $response[0]['url'] = $this->getURLResponse($properties);
-            $response[0]['thumbnailUrl'] = $this->getTumbnailURLResponse($properties);
+            $response[0]['thumbnailUrl'] = $this->getThumbnailURLResponse($properties);
             $response[0]['deleteUrl'] =  $this->getURLResponseDelete($properties);
             $response[0]['deleteType'] = 'DELETE';
             $response[0]['type'] = $properties['mimetype'];
@@ -744,9 +741,9 @@ class FARSymfony2UploadLib
     private function getURLResponse($properties)
     {
         return $this->params['param_temp_path_url_prefix'].'/tmp/'.
-               $properties['session'].'/'.
-               $properties['id_session'].'/'.
-               $properties['name_uid'];
+            $properties['session'].'/'.
+            $properties['id_session'].'/'.
+            $properties['name_uid'];
     }
 
     /**
@@ -757,12 +754,12 @@ class FARSymfony2UploadLib
     private function getURLResponseDelete($properties)
     {
         return $this->request->getBaseUrl().'/'.
-               $this->params['param_prefix'].
-               '/tmp/'.
-               $properties['session'].'/'.
-               $properties['id_session'].'/'.
-               $properties['name_uid'].'/'.
-               'DELETE';
+            $this->params['param_prefix'].
+            '/tmp/'.
+            $properties['session'].'/'.
+            $properties['id_session'].'/'.
+            $properties['name_uid'].'/'.
+            'DELETE';
     }
 
     /**
@@ -770,12 +767,12 @@ class FARSymfony2UploadLib
      *
      * @return string
      */
-    private function getTumbnailURLResponse($properties)
+    private function getThumbnailURLResponse($properties)
     {
         return $this->params['param_temp_path_url_prefix'].'/tmp/'.
-        $properties['session'].'/'.
-        $properties['id_session'].'/'.
-        $properties['thumbnail_name'];
+            $properties['session'].'/'.
+            $properties['id_session'].'/'.
+            $properties['thumbnail_name'];
     }
 
     /**
@@ -809,7 +806,7 @@ class FARSymfony2UploadLib
         $properties['session'] = $session;
         $properties['id_session'] = $id_session;
 
-        return $this->getTumbnailURLResponse($properties);
+        return $this->getThumbnailURLResponse($properties);
     }
 
     /**
@@ -826,13 +823,13 @@ class FARSymfony2UploadLib
 
         $fs = new Filesystem();
         $fs->mkdir($properties['temp_dir'].'/'.
-                   $this->params['param_thumbnail_directory_prefix']);
+            $this->params['param_thumbnail_directory_prefix']);
 
         $imagine->open($properties['temp_dir'].'/'.
-                       $properties['name_uid'])
-                ->thumbnail($size, $mode)
-                ->save($properties['temp_dir'].'/'.
-                       $properties['thumbnail_name']);
+            $properties['name_uid'])
+            ->thumbnail($size, $mode)
+            ->save($properties['temp_dir'].'/'.
+                $properties['thumbnail_name']);
     }
 
     /**
