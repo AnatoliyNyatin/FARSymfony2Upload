@@ -102,7 +102,7 @@ class FARSymfony2UploadLib
 
                 $validFile = $this->validateFile($properties);
                 if ($validFile[0] == true) {
-                    $this->imageFixOrientation($uploadedFile);
+                    //$this->imageFixOrientation($uploadedFile);
                     $file = [];
                     $file['pathDest'] = $properties['session'].'/'.$id_session.'/'.$properties['name_uid'];
 
