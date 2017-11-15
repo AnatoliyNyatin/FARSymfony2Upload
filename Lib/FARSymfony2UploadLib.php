@@ -89,11 +89,11 @@ class FARSymfony2UploadLib
     {
         $this->id_session = $id_session;
 
-        $response['data'] = array('files' => '');
+        $response['data'] = ['files' => []];
         /* @var FileBag $filebag */
         foreach ($this->request->files as $filebag) {
             /* @var UploadedFile $file */
-            foreach ($filebag as $uploadedFile) {
+            foreach ($filebag as $index => $uploadedFile) {
                 $properties = $this->getFileProperties($uploadedFile);
 
                 $properties['name'] = $this->discoverLocalTempFilename($properties);
@@ -109,7 +109,7 @@ class FARSymfony2UploadLib
                     $contents = file_get_contents($uploadedFile->getRealPath());
                     $file['saved'] = $this->local_filesystem->write($file['pathDest'], $contents);
                 }
-                $response['data'] = $this->getjQueryUploadResponse($properties, $validFile);
+                $response['data']['files'][] = $this->getjQueryUploadResponse($properties, $validFile);
             }
         }
 
@@ -532,11 +532,11 @@ class FARSymfony2UploadLib
     private function getFileProperties($file)
     {
         $properties = array();
-        $fileInfo = pathinfo($file->getClientOriginalName());
+        $extension = $file->guessExtension();
 
-        $properties['original_name'] = md5($file->getClientOriginalName().time()).'.'.$fileInfo['extension'];
+        $properties['original_name'] = md5($file->getClientOriginalName().uniqid('image', true).time()).'.'.$extension;
         $properties['upload_original_name'] = $file->getClientOriginalName();
-        $properties['extension'] = $file->guessExtension();
+        $properties['extension'] = $extension;
 
         $properties['name'] = $this->getFileNameOrThumbnail($properties['original_name'], false);
         $properties['name_uid'] = $properties['original_name'];
@@ -718,16 +718,16 @@ class FARSymfony2UploadLib
      */
     private function getJQueryUploadResponse($properties, $validFile)
     {
-        $response[0]['name'] = $properties['name'];
-        $response[0]['size'] = $properties['size'];
+        $response['name'] = $properties['name'];
+        $response['size'] = $properties['size'];
         if ($validFile[0]) {
-            $response[0]['url'] = $this->getURLResponse($properties);
-            $response[0]['thumbnailUrl'] = $this->getThumbnailURLResponse($properties);
-            $response[0]['deleteUrl'] =  $this->getURLResponseDelete($properties);
-            $response[0]['deleteType'] = 'DELETE';
-            $response[0]['type'] = $properties['mimetype'];
+            $response['url'] = $this->getURLResponse($properties);
+            $response['thumbnailUrl'] = $this->getThumbnailURLResponse($properties);
+            $response['deleteUrl'] =  $this->getURLResponseDelete($properties);
+            $response['deleteType'] = 'DELETE';
+            $response['type'] = $properties['mimetype'];
         } else {
-            $response[0]['error'] = $validFile[1];
+            $response['error'] = $validFile[1];
         }
 
         return $response;
