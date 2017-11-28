@@ -2,6 +2,8 @@
 
 namespace faparicior\FARSymfony2UploadBundle\Lib;
 
+use Imagine\Image\Box;
+use Imagine\Image\Point;
 use League\Flysystem\MountManager;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Finder\Finder;
@@ -46,6 +48,7 @@ class FARSymfony2UploadLib
         RequestStack $request_stack,
         Session $session,
         $param_prefix,
+        $param_crop_url,
         $param_temp_path,
         $param_temp_path_url_prefix,
         $param_thumbnail_directory_prefix,
@@ -66,6 +69,7 @@ class FARSymfony2UploadLib
         $this->trans = $translator;
 
         $this->params['param_prefix'] = $param_prefix;
+        $this->params['param_crop_url'] = $param_crop_url;
         $this->params['param_temp_path'] = $param_temp_path;
         $this->params['param_temp_path_url_prefix'] = $param_temp_path_url_prefix;
         $this->params['param_thumbnail_directory_prefix'] = $param_thumbnail_directory_prefix;
@@ -96,20 +100,19 @@ class FARSymfony2UploadLib
             foreach ($filebag as $index => $uploadedFile) {
                 $properties = $this->getFileProperties($uploadedFile);
 
-                $properties['name'] = $this->discoverLocalTempFilename($properties);
-                $properties['name_uid'] = $properties['name'];
-                $properties['thumbnail_name'] = $this->getFileNameOrThumbnail($properties['name_uid'], true);
+                $properties['uid'] = $this->discoverLocalTempFilename($properties);
+                $properties['unique_name'] = $properties['uid'] . '.' . $properties['extension'];
+                $properties['thumbnail_name'] = $this->getFileNameOrThumbnail($properties['unique_name'], true);
 
                 $validFile = $this->validateFile($properties);
                 if ($validFile[0] == true) {
-                    //$this->imageFixOrientation($uploadedFile);
-                    $file = [];
-                    $file['pathDest'] = $properties['session'].'/'.$id_session.'/'.$properties['name_uid'];
+                    $properties['dest'] = $properties['session'].'/'.$id_session.'/';
+                    $pathDest = $properties['dest'] . $properties['unique_name'];
 
-                    $contents = file_get_contents($uploadedFile->getRealPath());
-                    $file['saved'] = $this->local_filesystem->write($file['pathDest'], $contents);
+                    $contents = file_get_contents($properties['real_path']);
+                    $this->local_filesystem->write($pathDest, $contents);
+                    $response['data']['files'][] = $this->getjQueryUploadResponse($properties, $validFile);
                 }
-                $response['data']['files'][] = $this->getjQueryUploadResponse($properties, $validFile);
             }
         }
 
@@ -253,6 +256,7 @@ class FARSymfony2UploadLib
                 array_push($filesNew, $this->mappingFileSystem($file, 'file', true));
             }
         }
+
 
         if ($this->params['param_create_thumbnail']) {
             $files = $this->remote_filesystem->listContents($path .'/'.
@@ -426,7 +430,7 @@ class FARSymfony2UploadLib
      */
     public function syncFilesLocalRemote($files, $rewriteFile)
     {
-        $filesNew = array();
+        $filesNew = [];
 
         foreach ($files as $file) {
             $exist = $this->remote_filesystem->has($file['pathDest']);
@@ -444,7 +448,7 @@ class FARSymfony2UploadLib
                 $file['saved'] = $this->remote_filesystem->write($file['pathDest'], $contents);
                 $file['duplicated'] = true;
             }
-            array_push($filesNew, $file);
+            $filesNew[] = $file;
         }
 
         return $filesNew;
@@ -487,9 +491,9 @@ class FARSymfony2UploadLib
         $i = 1;
         $filesystem = new Filesystem();
 
-        $fileProperties = pathinfo($properties['name_uid']);
-        $filename = $fileProperties['filename'];
-        $extension = $fileProperties['extension'];
+        //$fileProperties = pathinfo($properties['name_uid']);
+        $filename = $properties['uid'];
+        $extension = $properties['extension'];
         $dirname = $properties['temp_dir'];
 
         if ($filesystem->exists($dirname.'/'.
@@ -501,10 +505,9 @@ class FARSymfony2UploadLib
                 $i++;
             }
 
-            $filenameDef = $filename.'('.$i.')'.'.'.
-                $extension;
+            $filenameDef = $filename.'('.$i.')'/*.'.'.$extension*/;
         } else {
-            $filenameDef = $properties['name_uid'];
+            $filenameDef = $filename/* . $extension*/;
         }
 
         return $filenameDef;
@@ -524,6 +527,13 @@ class FARSymfony2UploadLib
         return $files;
     }
 
+    public function deleteFilesRemote($files)
+    {
+        foreach ($files as $file) {
+            $this->remote_filesystem->delete($file['pathOrig']);
+        }
+    }
+
     /**
      * @param UploadedFile $file
      *
@@ -533,14 +543,18 @@ class FARSymfony2UploadLib
     {
         $properties = array();
         $extension = $file->guessExtension();
+        $extension = $extension === 'jpeg' ? 'jpg' : $extension;
+        $properties['uid'] = md5($file->getClientOriginalName().uniqid('image', true).time());
 
-        $properties['original_name'] = md5($file->getClientOriginalName().uniqid('image', true).time()).'.'.$extension;
+        $properties['unique_name'] = $properties['uid'] . '.' . $extension;
+        //$properties['original_name'] = md5($file->getClientOriginalName().uniqid('image', true).time()).'.'.$extension;
         $properties['upload_original_name'] = $file->getClientOriginalName();
         $properties['extension'] = $extension;
+        $properties['real_path'] = $file->getRealPath();
 
-        $properties['name'] = $this->getFileNameOrThumbnail($properties['original_name'], false);
-        $properties['name_uid'] = $properties['original_name'];
-        $properties['thumbnail_name'] = $this->getFileNameOrThumbnail($properties['original_name'], true);
+        //$properties['uid'] = $this->getFileNameOrThumbnail($properties['unique_name'], false);
+        //$properties['name_uid'] = $properties['original_name'];
+        $properties['thumbnail_name'] = $this->getFileNameOrThumbnail($properties['unique_name'], true);
         $properties['size'] = $file->getClientSize();
         $properties['maxfilesize'] = $file->getMaxFilesize();
         $properties['mimetype'] = $file->getMimeType();
@@ -602,14 +616,7 @@ class FARSymfony2UploadLib
     private function validateFileExtension($properties)
     {
 
-        if (array_search(
-            $properties['extension'],
-            $this->params['param_file_extensions_allowed']
-        )
-        ) {
-            return true;
-        }
-        return false;
+        return in_array($properties['extension'], $this->params['param_file_extensions_allowed'], true);
     }
 
     /**
@@ -718,7 +725,7 @@ class FARSymfony2UploadLib
      */
     private function getJQueryUploadResponse($properties, $validFile)
     {
-        $response['name'] = $properties['name'];
+        $response['name'] = $properties['unique_name'];
         $response['size'] = $properties['size'];
         if ($validFile[0]) {
             $response['url'] = $this->getURLResponse($properties);
@@ -743,7 +750,7 @@ class FARSymfony2UploadLib
         return $this->params['param_temp_path_url_prefix'].'/tmp/'.
             $properties['session'].'/'.
             $properties['id_session'].'/'.
-            $properties['name_uid'];
+            $properties['unique_name'];
     }
 
     /**
@@ -758,7 +765,7 @@ class FARSymfony2UploadLib
             '/tmp/'.
             $properties['session'].'/'.
             $properties['id_session'].'/'.
-            $properties['name_uid'].'/'.
+            $properties['unique_name'].'/'.
             'DELETE';
     }
 
@@ -809,6 +816,30 @@ class FARSymfony2UploadLib
         return $this->getThumbnailURLResponse($properties);
     }
 
+    //Very bad function
+    public function createCropped($file)
+    {
+        //TODO: Rewrite this function. Need different crop without S3
+        $params = [
+            'key' => '/' . $this->remote_filesystem->getAdapter()->getPathPrefix() . $file['path'],
+            'x' => $file['x'],
+            'y' => $file['y'],
+            'scale' => $file['scale'],
+            'angle' => $file['angle'],
+            'width' => $file['width'],
+            'height' => $file['height'],
+        ];
+        $ch = curl_init();
+        curl_setopt_array($ch, [
+            CURLOPT_URL => $this->params['param_crop_url'].'?'.http_build_query($params),
+            CURLOPT_RETURNTRANSFER => true,
+        ]);
+        $data = json_decode(curl_exec($ch));
+        curl_close($ch);
+
+        return $data->name ?? null;
+    }
+
     /**
      * @param $properties
      */
@@ -826,7 +857,7 @@ class FARSymfony2UploadLib
             $this->params['param_thumbnail_directory_prefix']);
 
         $imagine->open($properties['temp_dir'].'/'.
-            $properties['name_uid'])
+            $properties['unique_name'])
             ->thumbnail($size, $mode)
             ->save($properties['temp_dir'].'/'.
                 $properties['thumbnail_name']);
